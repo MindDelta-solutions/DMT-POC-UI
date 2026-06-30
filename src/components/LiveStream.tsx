@@ -26,14 +26,14 @@ interface StreamMeta { total_frames: number; fps: number; }
 interface LiveStreamProps { filename: string; classes: string[]; labels: boolean; }
 type Status = 'connecting' | 'streaming' | 'paused' | 'done' | 'error' | 'closed';
 
-const BADGE: Record<Status, { label: string; cls: string }> = {
-  connecting: { label: 'Connecting…',  cls: 'bg-evify-yellow text-evify-dark' },
-  streaming:  { label: 'Live',         cls: 'bg-evify-teal text-white' },
-  paused:     { label: 'Paused',       cls: 'bg-gray-400 text-white' },
-  done:       { label: 'Finished',     cls: 'bg-gray-300 text-gray-700' },
-  error:      { label: 'Error',        cls: 'bg-red-500 text-white' },
-  closed:     { label: 'Disconnected', cls: 'bg-gray-300 text-gray-700' },
-};
+// const BADGE: Record<Status, { label: string; cls: string }> = {
+//   connecting: { label: 'Connecting…',  cls: 'bg-evify-yellow text-evify-dark' },
+//   streaming:  { label: 'Live',         cls: 'bg-evify-teal text-white' },
+//   paused:     { label: 'Paused',       cls: 'bg-gray-400 text-white' },
+//   done:       { label: 'Finished',     cls: 'bg-gray-300 text-gray-700' },
+//   error:      { label: 'Error',        cls: 'bg-red-500 text-white' },
+//   closed:     { label: 'Disconnected', cls: 'bg-gray-300 text-gray-700' },
+// };
 
 function formatTime(frames: number, fps: number) {
   const secs = Math.floor(frames / fps);
@@ -53,7 +53,7 @@ export default function LiveStream({ filename, classes, labels }: LiveStreamProp
   const [meta,         setMeta]         = useState<StreamMeta | null>(null);
   const [currentFrame, setCurrentFrame] = useState(0);
   const [paused,       setPaused]       = useState(false);
-  const [speed,        setSpeed]        = useState(1.0);
+  // const [speed,        setSpeed]        = useState(1.0);
   const [errorMsg,     setErrorMsg]     = useState<string | null>(null);
   const [isExpanded,   setIsExpanded]   = useState(false);
 
@@ -143,7 +143,7 @@ export default function LiveStream({ filename, classes, labels }: LiveStreamProp
     }
   }
 
-  function changeSpeed(val: number) { send({ type: 'speed', value: val }); setSpeed(val); }
+  // function changeSpeed(val: number) { send({ type: 'speed', value: val }); setSpeed(val); }
 
   function onSeekStart() { seekingRef.current = true; }
   function onSeekChange(e: React.ChangeEvent<HTMLInputElement>) { setCurrentFrame(parseInt(e.target.value)); }
@@ -154,7 +154,7 @@ export default function LiveStream({ filename, classes, labels }: LiveStreamProp
     seekingRef.current = false;
   }
 
-  const badge = BADGE[status];
+  // const badge = BADGE[status];
   const controlsDisabled = status === 'done' || status === 'closed' || status === 'error';
 
   // ─── Compact card ────────────────────────────────────────────────────────────
@@ -165,7 +165,7 @@ export default function LiveStream({ filename, classes, labels }: LiveStreamProp
         <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200">
           <p className="font-medium text-evify-dark text-sm truncate">{filename}</p>
           <div className="flex items-center gap-2 shrink-0 ml-2">
-            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${badge.cls}`}>{badge.label}</span>
+            {/* <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${badge.cls}`}>{badge.label}</span> */}
             <button onClick={() => setIsExpanded(true)} title="Expand view"
               className="p-1.5 rounded-md text-gray-400 hover:text-evify-teal hover:bg-gray-100 transition-colors">
               <ExpandIcon />
@@ -215,7 +215,7 @@ export default function LiveStream({ filename, classes, labels }: LiveStreamProp
             <div className="flex items-center justify-between px-5 py-3 bg-gray-900 shrink-0 border-b border-gray-700">
               <p className="text-gray-100 font-medium text-sm truncate">{filename}</p>
               <div className="flex items-center gap-3 shrink-0 ml-3">
-                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${badge.cls}`}>{badge.label}</span>
+                {/* <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${badge.cls}`}>{badge.label}</span> */}
                 <button onClick={() => setIsExpanded(false)} title="Close  (Esc)"
                   className="p-1.5 rounded-md text-gray-400 hover:text-white hover:bg-gray-700 transition-colors">
                   <CompressIcon />

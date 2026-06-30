@@ -68,6 +68,25 @@ export default function LiveStream({ filename, classes, labels }: LiveStreamProp
     if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
   }
 
+  const classesRef = useRef(classes);
+  const labelsRef  = useRef(labels);
+
+  // Keep refs in sync so the reconnect effect always sends fresh values on onopen
+  useEffect(() => { classesRef.current = classes; }, [classes]);
+  useEffect(() => { labelsRef.current  = labels;  }, [labels]);
+
+  // Send classes / labels changes mid-stream without reconnecting
+  const mountedRef = useRef(false);
+  useEffect(() => {
+    if (!mountedRef.current) { mountedRef.current = true; return; }
+    send({ type: 'classes', value: classes });
+  }, [classes.join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!mountedRef.current) return;
+    send({ type: 'labels', value: labels });
+  }, [labels]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     const ws = new WebSocket(`${WS_BASE_URL}/stream`);
     wsRef.current = ws;
@@ -87,7 +106,7 @@ export default function LiveStream({ filename, classes, labels }: LiveStreamProp
 
     ws.onopen = () => {
       if (isStale()) return;
-      ws.send(JSON.stringify({ video: filename, classes, speed: 1.0, labels }));
+      ws.send(JSON.stringify({ video: filename, classes: classesRef.current, speed: 1.0, labels: labelsRef.current }));
     };
 
     ws.onmessage = (event) => {
@@ -127,11 +146,12 @@ export default function LiveStream({ filename, classes, labels }: LiveStreamProp
     };
 
     return () => {
+      if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'stop' }));
       ws.close();
       wsRef.current = null;
       if (blobUrlRef.current) { URL.revokeObjectURL(blobUrlRef.current); blobUrlRef.current = null; }
     };
-  }, [filename, classes.join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [filename]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function togglePause() {
     if (paused) {

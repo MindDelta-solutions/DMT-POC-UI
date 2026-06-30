@@ -2,63 +2,82 @@ import { useEffect, useState } from 'react';
 import Header from './components/Header';
 import VideoSelector from './components/VideoSelector';
 import FeaturePanel from './components/FeaturePanel';
-import LiveStreamGrid from './components/LiveStreamGrid';
+import LiveStreamGrid, { type ActiveStream } from './components/LiveStreamGrid';
 import { featuresToClasses } from './config/features';
 import type { AIFeature, VehicleType, VideoItem, VideoSelection } from './types';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
-interface ActiveStream {
-  filename: string;
-  classes: string[];
-  labels: boolean;
-}
+type StreamMode = 'ondemand' | 'live';
+
+const EMPTY_SELECTION: VideoSelection = { videoId: '', features: [], vehicleTypes: [] };
 
 function App() {
+  const [mode, setMode] = useState<StreamMode>('ondemand');
+
   const [videos,        setVideos]        = useState<VideoItem[]>([]);
   const [videosLoading, setVideosLoading] = useState(true);
   const [videosError,   setVideosError]   = useState<string | null>(null);
 
-  const [selection,    setSelection]    = useState<VideoSelection | null>(null);
-  const [activeStream, setActiveStream] = useState<ActiveStream | null>(null);
-  const [showLabels,   setShowLabels]   = useState(true);
-  const [submitError,  setSubmitError]  = useState<string | null>(null);
+  // On-demand state
+  const [odSelection,  setOdSelection]  = useState<VideoSelection | null>(null);
 
-  console.log("API_BASE_URL =", API_BASE_URL);
-  console.log("Videos URL =", `${API_BASE_URL}/videos`);
-  // Fetch available video list from the backend on mount
+  // Live state — always non-null so FeaturePanel stays unlocked in live mode
+  const [liveSelection, setLiveSelection] = useState<VideoSelection>(EMPTY_SELECTION);
+
+  const [activeStream,  setActiveStream]  = useState<ActiveStream | null>(null);
+  const [liveLoading,   setLiveLoading]   = useState(false);
+  const [showLabels,    setShowLabels]    = useState(true);
+  const [submitError,   setSubmitError]   = useState<string | null>(null);
+
   useEffect(() => {
-  fetch(`${API_BASE_URL}/videos`, {
-    headers: {
-      "ngrok-skip-browser-warning": "true",
-    },
-  })
-    .then((r) => {
-      if (!r.ok) {
-        throw new Error(`Server responded with ${r.status}`);
-      }
-      return r.json();
+    fetch(`${API_BASE_URL}/videos`, {
+      headers: { 'ngrok-skip-browser-warning': 'true' },
     })
-    .then(({ videos: stems }: { videos: string[] }) => {
-      setVideos(
-        stems.map((stem) => ({
-          id: stem,
-          name: stem,
-          filename: `${stem}.mp4`,
-        }))
-      );
-    })
-    .catch((err: Error) => {
-      console.error("Video fetch error:", err);
-      setVideosError(err.message);
-    })
-    .finally(() => {
-      setVideosLoading(false);
-    });
-}, []);
+      .then((r) => {
+        if (!r.ok) throw new Error(`Server responded with ${r.status}`);
+        return r.json();
+      })
+      .then(({ videos: stems }: { videos: string[] }) => {
+        setVideos(
+          stems.map((stem) => ({ id: stem, name: stem, filename: `${stem}.mp4` }))
+        );
+      })
+      .catch((err: Error) => {
+        setVideosError(err.message);
+      })
+      .finally(() => setVideosLoading(false));
+  }, []);
+
+  // ─── Helpers ────────────────────────────────────────────────────────────────
+
+  const currentSelection = mode === 'live' ? liveSelection : odSelection;
+
+  function setSelection(updater: (prev: VideoSelection | null) => VideoSelection | null) {
+    if (mode === 'live') {
+      setLiveSelection(prev => updater(prev) ?? EMPTY_SELECTION);
+    } else {
+      setOdSelection(updater);
+    }
+  }
+
+  // Recalculate active stream classes whenever selection changes mid-stream
+  function updateActiveClasses(sel: VideoSelection) {
+    const newClasses = featuresToClasses(sel.features, sel.vehicleTypes);
+    setActiveStream(s => s ? { ...s, classes: newClasses } : null);
+  }
+
+  // ─── Handlers ───────────────────────────────────────────────────────────────
+
+  function handleModeSwitch(newMode: StreamMode) {
+    setMode(newMode);
+    setActiveStream(null);
+    setSubmitError(null);
+  }
 
   function handleVideoSelect(videoId: string) {
-    setSelection({ videoId, features: [], vehicleTypes: [] });
+    const next = { videoId, features: [], vehicleTypes: [] };
+    setOdSelection(next);
     setActiveStream(null);
     setSubmitError(null);
   }
@@ -67,11 +86,13 @@ function App() {
     setSelection((prev) => {
       if (!prev) return prev;
       const has = prev.features.includes(feature);
-      return {
+      const next: VideoSelection = {
         ...prev,
         features:     has ? prev.features.filter((f) => f !== feature) : [...prev.features, feature],
         vehicleTypes: feature === 'vehicleDetection' && has ? [] : prev.vehicleTypes,
       };
+      if (activeStream) updateActiveClasses(next);
+      return next;
     });
   }
 
@@ -81,30 +102,68 @@ function App() {
       const vehicleTypes = prev.vehicleTypes.includes(vehicleType)
         ? prev.vehicleTypes.filter((v) => v !== vehicleType)
         : [...prev.vehicleTypes, vehicleType];
-      return { ...prev, vehicleTypes };
+      const next = { ...prev, vehicleTypes };
+      if (activeStream) updateActiveClasses(next);
+      return next;
     });
+  }
+
+  function handleLabelsChange(checked: boolean) {
+    setShowLabels(checked);
+    if (activeStream) setActiveStream(s => s ? { ...s, labels: checked } : null);
   }
 
   function handleSubmit() {
     setSubmitError(null);
-    if (!selection) {
-      setSubmitError('Please select a video.');
-      return;
-    }
-    const video = videos.find((v) => v.id === selection.videoId);
+    if (!odSelection) { setSubmitError('Please select a video.'); return; }
+    const video = videos.find((v) => v.id === odSelection.videoId);
     if (!video) return;
-
-    const classes = featuresToClasses(selection.features, selection.vehicleTypes);
-    setActiveStream({ filename: video.filename, classes, labels: showLabels });
+    const classes = featuresToClasses(odSelection.features, odSelection.vehicleTypes);
+    setActiveStream({ mode: 'ondemand', filename: video.filename, classes, labels: showLabels });
   }
 
-  const selectedVideo = videos.find((v) => v.id === selection?.videoId) ?? null;
+  function handleGoLive() {
+    setSubmitError(null);
+    setLiveLoading(true);
+    const classes = featuresToClasses(liveSelection.features, liveSelection.vehicleTypes);
+    setTimeout(() => {
+      setLiveLoading(false);
+      setActiveStream({ mode: 'live', classes, labels: showLabels });
+    }, 5000);
+  }
+
+  function handleLiveStop() {
+    setActiveStream(null);
+    setLiveLoading(false);
+  }
+
+  const selectedVideo = videos.find((v) => v.id === (odSelection?.videoId ?? '')) ?? null;
+
+  // ─── Render ─────────────────────────────────────────────────────────────────
 
   return (
     <div className="min-h-screen bg-evify-gray">
       <Header />
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+
+        {/* Mode tabs */}
+        <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit">
+          {(['ondemand', 'live'] as StreamMode[]).map((m) => (
+            <button
+              key={m}
+              onClick={() => handleModeSwitch(m)}
+              className={`px-5 py-2 rounded-lg text-sm font-medium transition-colors ${
+                mode === m
+                  ? 'bg-white text-evify-dark shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {m === 'ondemand' ? 'On-Demand' : 'Live Camera'}
+            </button>
+          ))}
+        </div>
+
         {videosLoading ? (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center text-gray-400 text-sm">
             Loading available videos…
@@ -115,19 +174,26 @@ function App() {
           </div>
         ) : (
           <>
-            <VideoSelector
-              videos={videos}
-              selectedId={selection?.videoId ?? null}
-              onSelect={handleVideoSelect}
-            />
+            {/* Step 1 — Video selector (on-demand only) */}
+            {mode === 'ondemand' && (
+              <VideoSelector
+                videos={videos}
+                selectedId={odSelection?.videoId ?? null}
+                onSelect={handleVideoSelect}
+              />
+            )}
 
+
+            {/* Step 2 — Feature panel */}
             <FeaturePanel
-              videoName={selectedVideo?.name ?? null}
-              selection={selection}
+              videoName={mode === 'live' ? null : (selectedVideo?.name ?? null)}
+              selection={currentSelection}
+              step={mode === 'live' ? 1 : 2}
               onFeatureToggle={handleFeatureToggle}
               onVehicleTypeToggle={handleVehicleTypeToggle}
             />
 
+            {/* Submit row */}
             <div className="flex flex-col items-end gap-3">
               {submitError && <p className="text-sm text-red-500">{submitError}</p>}
               <div className="flex items-center gap-4">
@@ -136,22 +202,69 @@ function App() {
                     type="checkbox"
                     className="h-4 w-4 accent-evify-teal cursor-pointer"
                     checked={showLabels}
-                    onChange={(e) => setShowLabels(e.target.checked)}
+                    onChange={(e) => handleLabelsChange(e.target.checked)}
                   />
                   Show Labels on Detections
                 </label>
-                <button
-                  type="button"
-                  onClick={handleSubmit}
-                  disabled={!selection}
-                  className="bg-evify-teal hover:bg-evify-teal-dark disabled:opacity-50 text-white font-semibold px-6 py-2.5 rounded-lg shadow-sm transition-colors"
-                >
-                  Start Stream
-                </button>
+                {mode === 'ondemand' ? (
+                  <button
+                    type="button"
+                    onClick={handleSubmit}
+                    disabled={!odSelection}
+                    className="bg-evify-teal hover:bg-evify-teal-dark disabled:opacity-50 text-white font-semibold px-6 py-2.5 rounded-lg shadow-sm transition-colors"
+                  >
+                    Start Stream
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleGoLive}
+                    disabled={!!activeStream || liveLoading}
+                    className="bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white font-semibold px-6 py-2.5 rounded-lg shadow-sm transition-colors flex items-center gap-2"
+                  >
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
+                      <span className="relative inline-flex h-2 w-2 rounded-full bg-white" />
+                    </span>
+                    Go Live
+                  </button>
+                )}
               </div>
             </div>
 
-            <LiveStreamGrid activeStream={activeStream} />
+            {/* Live loader */}
+            {liveLoading && (
+              <section className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
+                <h2 className="text-lg font-semibold text-evify-dark mb-1">2. Live Processed Output</h2>
+                <p className="text-sm text-gray-500 mb-4">Streaming processed frames from the backend in real time.</p>
+                <div className="max-w-2xl bg-black rounded-xl aspect-video flex flex-col items-center justify-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <span className="relative flex h-3 w-3">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                      <span className="relative inline-flex h-3 w-3 rounded-full bg-red-500" />
+                    </span>
+                    <span className="text-white font-semibold text-sm tracking-wide">LIVE</span>
+                  </div>
+                  <div className="flex gap-1.5">
+                    {[0, 1, 2, 3, 4].map((i) => (
+                      <span
+                        key={i}
+                        className="w-2 h-2 rounded-full bg-white/60 animate-bounce"
+                        style={{ animationDelay: `${i * 0.15}s` }}
+                      />
+                    ))}
+                  </div>
+                  <p className="text-gray-400 text-xs">Establishing live connection…</p>
+                </div>
+              </section>
+            )}
+
+            {/* Step 3 — Stream output */}
+            <LiveStreamGrid
+              activeStream={activeStream}
+              step={mode === 'live' ? 2 : 3}
+              onLiveStop={handleLiveStop}
+            />
           </>
         )}
       </main>

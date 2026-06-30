@@ -5,6 +5,7 @@ import VehicleTypeDropdown from './VehicleTypeDropdown';
 interface FeaturePanelProps {
   videoName: string | null;
   selection: VideoSelection | null;
+  step?: number;
   onFeatureToggle: (feature: AIFeature) => void;
   onVehicleTypeToggle: (vehicleType: VehicleType) => void;
 }
@@ -12,25 +13,30 @@ interface FeaturePanelProps {
 export default function FeaturePanel({
   videoName,
   selection,
+  step = 2,
   onFeatureToggle,
   onVehicleTypeToggle,
 }: FeaturePanelProps) {
   if (!selection) {
     return (
       <section className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
-        <h2 className="text-lg font-semibold text-evify-dark mb-1">2. Configure AI Features</h2>
+        <h2 className="text-lg font-semibold text-evify-dark mb-1">{step}. Configure AI Features</h2>
         <p className="text-sm text-gray-500">Select a video above to configure AI features.</p>
       </section>
     );
   }
 
+  // In live mode videoName is null — adjust subtitle accordingly
+
   const vehicleDetectionEnabled = selection.features.includes('vehicleDetection');
 
   return (
     <section className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
-      <h2 className="text-lg font-semibold text-evify-dark mb-1">2. Configure AI Features</h2>
+      <h2 className="text-lg font-semibold text-evify-dark mb-1">{step}. Configure AI Features</h2>
       <p className="text-sm text-gray-500 mb-4">
-        Choose the AI features to enable{videoName ? ` for ${videoName}` : ''}. Multiple features can be enabled.
+        {videoName
+          ? `Choose the AI features to enable for ${videoName}. Multiple features can be enabled.`
+          : 'Choose the AI features to apply to the live stream. Multiple features can be enabled.'}
       </p>
 
       <div className="border border-gray-200 rounded-lg p-4">

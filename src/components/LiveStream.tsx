@@ -201,15 +201,6 @@ export default function LiveStream({ filename, classes, labels }: LiveStreamProp
                 className="bg-evify-teal hover:bg-evify-teal-dark disabled:opacity-40 text-white text-xs font-semibold px-3 py-1.5 rounded-md transition-colors">
                 {paused ? '▶ Resume' : '⏸ Pause'}
               </button>
-              <div className="flex items-center gap-1 ml-auto">
-                <span className="text-xs text-gray-400 mr-1">Speed:</span>
-                {[0.5, 1.0, 1.5, 2.0].map(s => (
-                  <button key={s} onClick={() => changeSpeed(s)}
-                    className={`text-xs px-2 py-1 rounded transition-colors ${speed === s ? 'bg-evify-teal text-white font-semibold' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
-                    {s}×
-                  </button>
-                ))}
-              </div>
             </div>
           </div>
         )}
@@ -258,15 +249,6 @@ export default function LiveStream({ filename, classes, labels }: LiveStreamProp
                     className="bg-evify-teal hover:bg-evify-teal-dark disabled:opacity-40 text-white text-xs font-semibold px-3 py-1.5 rounded-md transition-colors">
                     {paused ? '▶ Resume' : '⏸ Pause'}
                   </button>
-                  <div className="flex items-center gap-1 ml-auto">
-                    <span className="text-xs text-gray-300 mr-1">Speed:</span>
-                    {[0.5, 1.0, 1.5, 2.0].map(s => (
-                      <button key={s} onClick={() => changeSpeed(s)}
-                        className={`text-xs px-2 py-1 rounded transition-colors ${speed === s ? 'bg-evify-teal text-white font-semibold' : 'bg-gray-700 text-gray-200 hover:bg-gray-600'}`}>
-                        {s}×
-                      </button>
-                    ))}
-                  </div>
                 </div>
               </div>
             )}

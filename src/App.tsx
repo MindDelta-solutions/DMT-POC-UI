@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Header from './components/Header';
 import VideoSelector from './components/VideoSelector';
 import FeaturePanel from './components/FeaturePanel';
 import LiveStreamGrid from './components/LiveStreamGrid';
+import LoadingDots from './components/LoadingDots';
 import { featuresToClasses } from './config/features';
 import type { AIFeature, VehicleType, VideoItem, VideoSelection } from './types';
 
@@ -23,6 +24,16 @@ function App() {
   const [activeStream, setActiveStream] = useState<ActiveStream | null>(null);
   const [showLabels,   setShowLabels]   = useState(true);
   const [submitError,  setSubmitError]  = useState<string | null>(null);
+  const [isBuffering,  setIsBuffering]  = useState(false);
+
+  const bufferTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Clear any pending buffer timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (bufferTimeoutRef.current) clearTimeout(bufferTimeoutRef.current);
+    };
+  }, []);
 
   console.log("API_BASE_URL =", API_BASE_URL);
   console.log("Videos URL =", `${API_BASE_URL}/videos`);
@@ -58,6 +69,8 @@ function App() {
 }, []);
 
   function handleVideoSelect(videoId: string) {
+    if (bufferTimeoutRef.current) clearTimeout(bufferTimeoutRef.current);
+    setIsBuffering(false);
     setSelection({ videoId, features: [], vehicleTypes: [] });
     setActiveStream(null);
     setSubmitError(null);
@@ -95,7 +108,18 @@ function App() {
     if (!video) return;
 
     const classes = featuresToClasses(selection.features, selection.vehicleTypes);
-    setActiveStream({ filename: video.filename, classes, labels: showLabels });
+
+    // Random buffer delay (3s - 8s) before actually sending the request to the backend
+    const bufferMs = Math.floor(Math.random() * (8000 - 3000 + 1)) + 3000;
+
+    if (bufferTimeoutRef.current) clearTimeout(bufferTimeoutRef.current);
+    setActiveStream(null);
+    setIsBuffering(true);
+
+    bufferTimeoutRef.current = setTimeout(() => {
+      setIsBuffering(false);
+      setActiveStream({ filename: video.filename, classes, labels: showLabels });
+    }, bufferMs);
   }
 
   const selectedVideo = videos.find((v) => v.id === selection?.videoId) ?? null;
@@ -143,15 +167,21 @@ function App() {
                 <button
                   type="button"
                   onClick={handleSubmit}
-                  disabled={!selection}
+                  disabled={!selection || isBuffering}
                   className="bg-evify-teal hover:bg-evify-teal-dark disabled:opacity-50 text-white font-semibold px-6 py-2.5 rounded-lg shadow-sm transition-colors"
                 >
-                  Start Stream
+                  {isBuffering ? <LoadingDots label="Loading" /> : 'Start Stream'}
                 </button>
               </div>
             </div>
 
-            <LiveStreamGrid activeStream={activeStream} />
+            {isBuffering ? (
+              <section className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center text-gray-400 text-sm">
+                <LoadingDots label="Loading" />
+              </section>
+            ) : (
+              <LiveStreamGrid activeStream={activeStream} />
+            )}
           </>
         )}
       </main>

@@ -16,8 +16,16 @@ export const AI_FEATURES: { id: AIFeature; label: string; description: string }[
     label: 'Vehicle Detection',
     description: 'Detect and classify vehicles by type',
   },
-  // pedestrianDetection temporarily hidden — re-add to this array to restore it
-  // { id: 'pedestrianDetection', label: 'Pedestrian Detection', description: 'Detect pedestrians in the frame' },
+  {
+    id: 'pedestrianDetection',
+    label: 'Pedestrian Detection',
+    description: 'Detect pedestrians in the frame',
+  },
+  {
+    id: 'potholeDetection',
+    label: 'Pothole Detection',
+    description: 'Detect potholes in the frame',
+  },
 ];
 
 export const VEHICLE_TYPES: { id: VehicleType; label: string }[] = [
@@ -64,6 +72,9 @@ export function featuresToClasses(features: AIFeature[], vehicleTypes: VehicleTy
         break;
       case 'pedestrianDetection':
         classes.push('pedestrian');
+        break;
+      case 'potholeDetection':
+        classes.push('pothole');
         break;
     }
   }

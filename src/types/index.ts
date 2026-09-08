@@ -2,7 +2,8 @@ export type AIFeature =
   | 'numberPlateBlur'
   | 'faceBlur'
   | 'vehicleDetection'
-  | 'pedestrianDetection';
+  | 'pedestrianDetection'
+  | 'potholeDetection';
 
 export type VehicleType = '2-wheeler' | 'auto-rickshaw' | 'car' | 'truck' | 'bus';
 

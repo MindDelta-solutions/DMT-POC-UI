@@ -4,8 +4,11 @@ import VideoSelector from './components/VideoSelector';
 import FeaturePanel from './components/FeaturePanel';
 import LiveStreamGrid from './components/LiveStreamGrid';
 import LoadingDots from './components/LoadingDots';
+import RouteMapPanel from './components/RouteMapPanel';
 import { featuresToClasses } from './config/features';
 import type { AIFeature, VehicleType, VideoItem, VideoSelection } from './types';
+
+type Tab = 'stream' | 'map';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
@@ -16,6 +19,8 @@ interface ActiveStream {
 }
 
 function App() {
+  const [activeTab, setActiveTab] = useState<Tab>('stream');
+
   const [videos,        setVideos]        = useState<VideoItem[]>([]);
   const [videosLoading, setVideosLoading] = useState(true);
   const [videosError,   setVideosError]   = useState<string | null>(null);
@@ -128,8 +133,30 @@ function App() {
     <div className="min-h-screen bg-evify-gray">
       <Header />
 
+      <nav className="max-w-6xl mx-auto px-4 sm:px-6 pt-6 flex gap-2">
+        {([
+          { id: 'stream', label: 'Live Stream' },
+          { id: 'map',    label: 'Ride Map' },
+        ] as const).map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setActiveTab(tab.id)}
+            className={`px-4 py-2 text-sm font-semibold rounded-lg transition-colors ${
+              activeTab === tab.id
+                ? 'bg-evify-teal text-white shadow-sm'
+                : 'bg-white text-gray-600 border border-gray-200 hover:border-evify-teal'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </nav>
+
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6">
-        {videosLoading ? (
+        {activeTab === 'map' ? (
+          <RouteMapPanel />
+        ) : videosLoading ? (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center text-gray-400 text-sm">
             Loading available videos…
           </div>

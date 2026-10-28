@@ -18,3 +18,14 @@ export interface VideoSelection {
   features: AIFeature[];
   vehicleTypes: VehicleType[];
 }
+
+export interface RoutePoint {
+  latitude: number;
+  longitude: number;
+  timestamp: string;
+}
+
+export interface RouteResponse {
+  video: string;
+  points: RoutePoint[];
+}

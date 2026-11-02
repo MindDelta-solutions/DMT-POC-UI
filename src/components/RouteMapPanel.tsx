@@ -1,9 +1,18 @@
 import { useEffect, useState } from 'react';
-import type { RoutePoint } from '../types';
+import type { RouteResponse, RoutePoint, TrafficResponse } from '../types';
 import LoadingDots from './LoadingDots';
 import MapView from './MapView';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+
+async function fetchJson<T>(url: string): Promise<T> {
+  const res = await fetch(url, { headers: { 'ngrok-skip-browser-warning': 'true' } });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.detail ?? `Server responded with ${res.status}`);
+  }
+  return res.json();
+}
 
 export default function RouteMapPanel() {
   const [videos,        setVideos]        = useState<string[]>([]);
@@ -12,6 +21,8 @@ export default function RouteMapPanel() {
 
   const [selectedVideo, setSelectedVideo]  = useState<string | null>(null);
   const [points,        setPoints]         = useState<RoutePoint[] | null>(null);
+  const [traffic,       setTraffic]        = useState<TrafficResponse | null>(null);
+  const [trafficError,  setTrafficError]   = useState<string | null>(null);
   const [mapLoading,    setMapLoading]     = useState(false);
   const [mapError,      setMapError]       = useState<string | null>(null);
 
@@ -31,6 +42,8 @@ export default function RouteMapPanel() {
   function handleSelect(video: string) {
     setSelectedVideo(video);
     setPoints(null);
+    setTraffic(null);
+    setTrafficError(null);
     setMapError(null);
   }
 
@@ -38,21 +51,21 @@ export default function RouteMapPanel() {
     if (!selectedVideo) return;
     setMapLoading(true);
     setMapError(null);
+    setTrafficError(null);
     setPoints(null);
+    setTraffic(null);
 
-    fetch(`${API_BASE_URL}/map/videos/${encodeURIComponent(selectedVideo)}/route`, {
-      headers: { 'ngrok-skip-browser-warning': 'true' },
-    })
-      .then(async (r) => {
-        if (!r.ok) {
-          const body = await r.json().catch(() => null);
-          throw new Error(body?.detail ?? `Server responded with ${r.status}`);
-        }
-        return r.json();
-      })
-      .then(({ points: pts }: { points: RoutePoint[] }) => setPoints(pts))
-      .catch((err: Error) => setMapError(err.message))
-      .finally(() => setMapLoading(false));
+    const routeUrl = `${API_BASE_URL}/map/videos/${encodeURIComponent(selectedVideo)}/route`;
+    const trafficUrl = `${API_BASE_URL}/map/videos/${encodeURIComponent(selectedVideo)}/traffic`;
+
+    Promise.all([
+      fetchJson<RouteResponse>(routeUrl)
+        .then((data) => setPoints(data.points))
+        .catch((err: Error) => setMapError(err.message)),
+      fetchJson<TrafficResponse>(trafficUrl)
+        .then((data) => setTraffic(data))
+        .catch((err: Error) => setTrafficError(err.message)),
+    ]).finally(() => setMapLoading(false));
   }
 
   if (videosLoading) {
@@ -129,7 +142,12 @@ export default function RouteMapPanel() {
           <p className="text-sm text-gray-500 mb-4">
             {selectedVideo} — {points.length} GPS points
           </p>
-          <MapView points={points} />
+          {trafficError && (
+            <p className="text-xs text-amber-600 mb-3">
+              Traffic data unavailable ({trafficError}); showing route only.
+            </p>
+          )}
+          <MapView points={points} traffic={traffic} />
         </section>
       )}
     </div>

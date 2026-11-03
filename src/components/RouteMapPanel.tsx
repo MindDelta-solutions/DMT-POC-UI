@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { RouteResponse, RoutePoint, TrafficResponse } from '../types';
+import type { RouteResponse, RoutePoint, TrafficResponse, MapVideoMeta } from '../types';
 import LoadingDots from './LoadingDots';
 import MapView from './MapView';
 
@@ -14,8 +14,72 @@ async function fetchJson<T>(url: string): Promise<T> {
   return res.json();
 }
 
+interface VideoCardProps {
+  video: MapVideoMeta;
+  isSelected: boolean;
+  onSelect: () => void;
+}
+
+function VideoCard({ video, isSelected, onSelect }: VideoCardProps) {
+  const [detailsOpen, setDetailsOpen] = useState(false);
+
+  return (
+    <div
+      className={`rounded-lg border-2 transition-colors ${
+        isSelected ? 'border-evify-teal bg-evify-teal/5' : 'border-gray-200 bg-gray-50 hover:border-gray-300'
+      }`}
+    >
+      <label className="flex items-center gap-3 p-3 cursor-pointer">
+        <input
+          type="radio"
+          name="map-video-selection"
+          className="h-4 w-4 accent-evify-teal cursor-pointer shrink-0"
+          checked={isSelected}
+          onChange={onSelect}
+        />
+        <p className="font-medium text-evify-dark truncate text-sm flex-1">{video.video_name}</p>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setDetailsOpen((open) => !open);
+          }}
+          className="text-gray-400 hover:text-evify-teal p-1 shrink-0"
+          aria-label="Toggle video details"
+        >
+          <span className={`inline-block transition-transform ${detailsOpen ? 'rotate-180' : ''}`}>▼</span>
+        </button>
+      </label>
+
+      {detailsOpen && (
+        <div className="px-3 pb-3 grid grid-cols-2 gap-2 text-xs border-t border-gray-200 pt-2 mx-3">
+          <div>
+            <p className="text-gray-400">Number Plate</p>
+            <p className="font-medium text-evify-dark">{video.vehicle_number_plate}</p>
+          </div>
+          <div>
+            <p className="text-gray-400">Rider</p>
+            <p className="font-medium text-evify-dark">{video.rider_name}</p>
+          </div>
+          <div>
+            <p className="text-gray-400">Date</p>
+            <p className="font-medium text-evify-dark">{video.date}</p>
+          </div>
+          <div>
+            <p className="text-gray-400">Time Window</p>
+            <p className="font-medium text-evify-dark">
+              {video.normalized_time_window.start} – {video.normalized_time_window.end}
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function RouteMapPanel() {
-  const [videos,        setVideos]        = useState<string[]>([]);
+  const [videos,        setVideos]        = useState<MapVideoMeta[]>([]);
   const [videosLoading, setVideosLoading]  = useState(true);
   const [videosError,   setVideosError]    = useState<string | null>(null);
 
@@ -26,6 +90,8 @@ export default function RouteMapPanel() {
   const [mapLoading,    setMapLoading]     = useState(false);
   const [mapError,      setMapError]       = useState<string | null>(null);
 
+  const selectedVideoMeta = videos.find((v) => v.video_name === selectedVideo) ?? null;
+
   useEffect(() => {
     fetch(`${API_BASE_URL}/map/videos`, {
       headers: { 'ngrok-skip-browser-warning': 'true' },
@@ -34,7 +100,7 @@ export default function RouteMapPanel() {
         if (!r.ok) throw new Error(`Server responded with ${r.status}`);
         return r.json();
       })
-      .then(({ videos: list }: { videos: string[] }) => setVideos(list))
+      .then(({ videos: list }: { videos: MapVideoMeta[] }) => setVideos(list))
       .catch((err: Error) => setVideosError(err.message))
       .finally(() => setVideosLoading(false));
   }, []);
@@ -93,27 +159,15 @@ export default function RouteMapPanel() {
         {videos.length === 0 ? (
           <p className="text-sm text-gray-400">No videos found.</p>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {videos.map((video) => {
-              const isSelected = selectedVideo === video;
-              return (
-                <label
-                  key={video}
-                  className={`flex items-center gap-3 rounded-lg border-2 transition-colors p-3 cursor-pointer ${
-                    isSelected ? 'border-evify-teal bg-evify-teal/5' : 'border-gray-200 bg-gray-50 hover:border-gray-300'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="map-video-selection"
-                    className="h-4 w-4 accent-evify-teal cursor-pointer shrink-0"
-                    checked={isSelected}
-                    onChange={() => handleSelect(video)}
-                  />
-                  <p className="font-medium text-evify-dark truncate text-sm">{video}</p>
-                </label>
-              );
-            })}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
+            {videos.map((video) => (
+              <VideoCard
+                key={video.video_name}
+                video={video}
+                isSelected={selectedVideo === video.video_name}
+                onSelect={() => handleSelect(video.video_name)}
+              />
+            ))}
           </div>
         )}
 
@@ -140,7 +194,10 @@ export default function RouteMapPanel() {
         <section className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
           <h2 className="text-lg font-semibold text-evify-dark mb-1">2. Route</h2>
           <p className="text-sm text-gray-500 mb-4">
-            {selectedVideo} — {points.length} GPS points
+            {selectedVideoMeta
+              ? `${selectedVideoMeta.rider_name} — ${selectedVideoMeta.vehicle_number_plate} — ${selectedVideoMeta.date}`
+              : selectedVideo}{' '}
+            — {points.length} GPS points
           </p>
           {trafficError && (
             <p className="text-xs text-amber-600 mb-3">

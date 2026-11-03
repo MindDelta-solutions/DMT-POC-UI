@@ -30,6 +30,14 @@ export interface RouteResponse {
   points: RoutePoint[];
 }
 
+export interface MapVideoMeta {
+  video_name: string;
+  vehicle_number_plate: string;
+  rider_name: string;
+  date: string;
+  normalized_time_window: { start: string; end: string };
+}
+
 export type TrafficLevel = 'low' | 'medium' | 'high';
 
 export interface TrafficSegment {
